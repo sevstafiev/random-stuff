@@ -1,0 +1,307 @@
+WHERE условия для выборки запросов 
+* означает все столбцы
+
+select * from billing WHERE sum>900 and currency in ('CHF','GBP')
+
+
+INSERT INTO table_name (column1, column2, column3, ...)
+VALUES (value1, value2, value3, ...); 
+
+INSERT INTO table_name
+VALUES (value1, value2, value3, ...);
+
+update billing set currency='USD' where payer_email='..'
+and recip_email='..'
+and sum=500.00;
+
+select count(.) #посчитать кол-во строк, которые содержит таблица
+select avg(budget) from project;
+
+DATEDIFF(project_finish, project_start) #разница в днях
+
+select 
+avg(DATEDIFF(project_finish, project_start)),
+max(datediff(project_finish, project_start))
+from project where project_finish is not null;
+
+
+
+select 
+	avg(DATEDIFF(project_finish, project_start)) as avg_days,
+	max(datediff(project_finish, project_start)) as max_days,
+	client_name
+from project where project_finish is not null
+group by client_name
+order by max_days DESC
+limit 10;
+
+
+select p.product_name, c.category_name, p.price
+	from product as p inner join category as c on p.category_id = c.category_id
+	
+	
+	
+SELECT good.name AS good_name, category.name AS category_name FROM category_has_good
+  INNER JOIN good ON category_has_good.good_id = good.id
+    INNER JOIN category ON category_has_good.category_id = category.id
+    ORDER BY good.name, category.name;
+
+
+SELECT COUNT(distinct birthdate)
+FROM people;
+
+
+
+
+LIKE:
+
+The % wildcard will match zero, one, or many characters in text. For example,
+ the following query matches companies like 'Data', 'DataC' 'DataCamp', 'DataMind', and so on:
+
+SELECT name
+FROM companies
+WHERE name LIKE 'Data%';
+
+The _ wildcard will match a single character. For example, 
+the following query matches companies like 'DataCamp', 'DataComp', and so on:
+
+
+
+
+COUNT(deathdate)    #посчитатет число ненулевых строк
+<> отрицание
+
+HAVING как filter, выполняется после group by
+
+
+ОБЪЕДИНЕНИЕ
+select ...
+union
+select ...
+
+
+
+
+-- Identify the home team as Bayern Munich, Schalke 04, or neither
+SELECT 
+    	 WHEN hometeam_id = 10189 THEN 'FC Schalke 04'
+         WHEN hometeam_id = 9823 THEN 'FC Bayern Munich'
+         ELSE 'Other' END AS home_team,
+	COUNT(id) AS total_matches
+FROM matches_germany
+-- Group by the CASE statement alias
+GROUP BY home_team;
+
+
+
+-- Select matches where Barcelona was the away team
+SELECT  
+	m.date,
+	t.team_long_name AS opponent,
+	case when m.home_goal < m.away_goal then 'Barcelona win!'
+        WHEN m.home_goal > m.away_goal then 'Barcelona loss :(' 
+        else 'Tie' end as outcome
+FROM matches_spain AS m
+-- Join teams_spain to matches_spain
+LEFT JOIN teams_spain AS t 
+ON m.hometeam_id = t.team_api_id
+WHERE m.awayteam_id = 8634;
+
+
+КРЧ джоины можно заменить коррелированными подзапросами
+Correlated subqueries:
+
+SELECT
+    m.date,
+   (SELECT team_long_name
+    FROM team AS t
+    -- Connect the team to the match table
+    WHERE t.team_api_id = m.hometeam_id) AS hometeam
+FROM match AS m;
+
+
+
+extract(month from date)
+
+
+
+Common table expressions:
+
+with s1 AS (
+	select...
+)
+s2 AS (
+...
+)
+
+select
+	...
+inner join s 
+on s.OOO = c.JJJ
+group by country;
+
+CTE is then stored in memory
+improves query performance
+
+Допустим их 3: s1 s2 s3
+Тогда s3 может использовать s1 и s2
+
+recursive CTE: SELF JOIN
+
+
+Way to generate a list of team names who played in a match:
+
+SELECT
+	m.date,
+    -- Get the home and away team names
+    hometeam,
+    awayteam,
+    m.home_goal,
+    m.away_goal
+FROM match AS m
+
+-- Join the home subquery to the match table
+left join (
+  SELECT 
+    match.id, 
+    team.team_long_name AS hometeam
+  FROM match
+  LEFT JOIN team
+  ON match.hometeam_id = team.team_api_id) AS home
+ON home.id = m.id
+
+-- Join the away subquery to the match table
+left join (
+  SELECT match.id, team.team_long_name AS awayteam
+  FROM match
+  LEFT JOIN team
+  -- Get the away team ID in the subquery
+  ON match.awayteam_id = team.team_api_id) AS away
+ON away.id = m.id;
+
+
+ТОЖЕ САМОЕ, НО ЧЕРЕЗ КОРРЕЛИРОВАННЫЕ ПОДЗАПРОСЫ:
+
+SELECT
+    m.date,
+    (SELECT team_long_name
+     FROM team AS t
+     WHERE t.team_api_id = m.hometeam_id) AS hometeam,
+    -- Connect the team to the match table
+    (SELECT team_long_name
+     FROM team AS t
+     WHERE t.team_api_id = m.awayteam_id) AS awayteam,
+    -- Select home and away goals
+     home_goal,
+     away_goal
+FROM match AS m;
+
+
+
+ТОЖЕ САМОЕ, НО ЧЕРЕЗ COMMON TABLE EXPRESSIONS:
+
+WITH home AS (
+  SELECT m.id, m.date, 
+  		 t.team_long_name AS hometeam, m.home_goal
+  FROM match AS m
+  LEFT JOIN team AS t 
+  ON m.hometeam_id = t.team_api_id),
+-- Declare and set up the away CTE
+away as (
+  SELECT m.id, m.date, 
+  		 t.team_long_name AS awayteam, m.away_goal
+  FROM match AS m
+  LEFT JOIN team AS t 
+  ON m.awayteam_id = t.team_api_id)
+-- Select date, home_goal, and away_goal
+SELECT 
+	home.date,
+    home.hometeam,
+    away.awayteam,
+    home.home_goal,
+    away.away_goal
+-- Join away and home on the id column
+FROM home
+INNER JOIN away
+ON home.id = away.id;
+
+
+
+ОКОННЫЕ ФУНКЦИИ:
+
+AVG(home_goal + away_goal) OVER() AS overall_avg
+FROM match
+WHERE season = ..
+
+
+
+RANK() OVER(ORDER BY home_goal + away_goal) as goals_rank
+RANK() OVER(ORDER BY home_goal + away_goal DESC) as goals_rank
+
+PARTITION BY() (по сути это группировка):
+AVG(home_goal + away_goal) OVER(PARTITION BY season) AS season_avg
+
+
+
+SLIDING WINDOW:
+
+ROWS BETWEEN <start> and <finish>
+PRECEDING (ПРЕДШЕСТВУЮЩИЙ)
+FOLLOWING
+UNBOUNDED PRECEDING (все с начала датасета)
+UNBOUNDED FOLLOWING
+CURRENT ROW
+
+sum(home_goal) over(order by date rows between unbounded preceding and current row) as running total  (кумулятивная сумма)
+	1 preceding and current row (будет считать сумму для теущего и предыдущего матча)
+
+avg(home_goal) over(ORDER BY date DESC
+         ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS running_avg
+		 
+		 
+		 
+		 
+-- Set up the home team CTE
+with home as (
+  SELECT m.id, t.team_long_name,
+	  CASE WHEN m.home_goal > m.away_goal THEN 'MU Win'
+		   WHEN m.home_goal < m.away_goal THEN 'MU Loss' 
+  		   ELSE 'Tie' END AS outcome
+  FROM match AS m
+  LEFT JOIN team AS t ON m.hometeam_id = t.team_api_id),
+-- Set up the away team CTE
+away as (
+  SELECT m.id, t.team_long_name,
+	  CASE WHEN m.home_goal > m.away_goal THEN 'MU Win'
+		   WHEN m.home_goal < m.away_goal THEN 'MU Loss' 
+  		   ELSE 'Tie' END AS outcome
+  FROM match AS m
+  LEFT JOIN team AS t ON m.awayteam_id = t.team_api_id)
+-- Select team names, the date and goals
+SELECT DISTINCT
+    m.date,
+    home.team_long_name AS home_team,
+    away.team_long_name AS away_team,
+    m.home_goal,
+    m.away_goal
+-- Join the CTEs onto the match table
+FROM match AS m
+left JOIN home ON m.id = home.id
+left JOIN away ON m.id = away.id
+WHERE m.season = '2014/2015'
+      AND (home.team_long_name = 'Manchester United' 
+           OR away.team_long_name = 'Manchester United');
+
+
+SELECT *
+FROM salesman
+WHERE name BETWEEN 'A' and 'L';
+
+
+expression IS NOT NULL
+
+
+
+LIMIT OFFSET
+LIMIT это сколько строк взять
+OFFSET это сколько первых строк выкинуть перед тем как ограничивать
